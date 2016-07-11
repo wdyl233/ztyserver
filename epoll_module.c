@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <signal.h>
 
 #include "epoll_module.h"
 
@@ -34,7 +35,16 @@ int epoll_loop(int *listen_fd, int *epoll_fd, struct sockaddr_in *client_addr,
 	char recv_buf[RECV_BUFFER_SIZE + 1];
 	unsigned char send_buf[SEND_BUFFER_SIZE + 1];
 
-	pid_t pid;
+	int count = 0;
+
+	/*设置忽略SIGPIPE信号 */
+	struct sigaction sa;
+	sa.sa_handler = SIG_IGN;
+	sa.sa_flags = 0;
+	if (sigemptyset(&sa.sa_mask) == -1 || sigaction(SIGPIPE, &sa, 0) == -1) {
+		perror("failed to ignore SIGPIPE; sigaction");
+		exit(EXIT_FAILURE);
+	}
 
 	for (;;) {
 		nfds = epoll_wait(*epoll_fd, events, MAXEPOLLSIZE, -1);
@@ -56,7 +66,7 @@ int epoll_loop(int *listen_fd, int *epoll_fd, struct sockaddr_in *client_addr,
 				epoll_ctl(*epoll_fd, EPOLL_CTL_ADD, confd, ev);
 			}
 
-			else {
+			else if (events[n].events | EPOLLIN) {
 				memset(recv_buf, '\0', sizeof(recv_buf));
 				read_bytes =
 				    recv(events[n].data.fd, recv_buf,
@@ -67,27 +77,18 @@ int epoll_loop(int *listen_fd, int *epoll_fd, struct sockaddr_in *client_addr,
 				}
 
 				else {
+
 					get_send_buf(recv_buf, send_buf,
 						     &send_bytes);
 
-					/* 多次send会出错 */
+					int send_str = send(events[n].data.fd,
+							    send_buf,
+							    send_bytes, 0);
 
-					pid = fork();
-
-					if (pid == 0) {
-						int send_str =
-						    send(events[n].data.fd,
-							 send_buf,
-							 send_bytes, 0);
-						close(events[n].data.fd);
-						return 0;
-					}
-
-					else if (pid != 0 && pid != -1) {
-						wait();
-					}
+					close(events[n].data.fd);
 				}
 			}
 		}
 	}
+
 }
