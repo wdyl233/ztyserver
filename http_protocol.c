@@ -16,9 +16,9 @@
 #include "http_protocol.h"
 #include "get_time.h"
 
-int get_send_buf(char *recv_buf, unsigned char *send_buf,int *send_bytes)
+int get_send_buf(char *recv_buf, unsigned char *send_buf, int *send_bytes)
 {
-    int uri_status,file_size;
+    int uri_status, file_size;
     char *mime_type;
 
     char uri_buf[URI_SIZE + 1];
@@ -26,8 +26,8 @@ int get_send_buf(char *recv_buf, unsigned char *send_buf,int *send_bytes)
 
     memset(send_buf, '\0', sizeof(send_buf));
     memset(file_buf, '\0', sizeof(file_buf));
-    memset(uri_buf,'\0',sizeof(uri_buf));
-	
+    memset(uri_buf, '\0', sizeof(uri_buf));
+
     if (get_uri(recv_buf, uri_buf) == NULL) {
         uri_status = URI_TOO_LONG;
     }
@@ -39,7 +39,6 @@ int get_send_buf(char *recv_buf, unsigned char *send_buf,int *send_bytes)
 
         case FILE_OK:
             mime_type = get_mime_type(uri_buf);
-			//printf("%s\n",mime_type);
             file_size = get_file_disk(uri_buf, file_buf);
             *send_bytes =
                 reply_normal_information
@@ -47,9 +46,9 @@ int get_send_buf(char *recv_buf, unsigned char *send_buf,int *send_bytes)
             break;
 
         case FILE_NOT_FOUND:
-            printf("in switch on case FILE_NOT_FOUND\n");
-            *send_bytes =
-                set_error_information(send_buf, FILE_NOT_FOUND);
+            //*send_bytes =
+            //    set_error_information(send_buf, FILE_NOT_FOUND);
+			*send_bytes = reply_error_information(send_buf);
             break;
 
         case FILE_FORBIDEN:
@@ -142,11 +141,8 @@ int get_uri_status(char *uri)
 char *get_mime_type(char *uri)
 {
     int len = strlen(uri);
-
-
-    //printf("%s", uri);
-
     int dot = len - 1;
+
     while (dot >= 0 && uri[dot] != '.') {
         dot--;
     }
@@ -229,6 +225,7 @@ int get_file_disk(char *uri, unsigned char *file_buf)
     }
     //printf("file %s size : %lu , read %d\n", uri, st_size, read_count);
     //printf("%s", file_buf);
+    close(fd);
     return read_count;
 }
 
@@ -290,10 +287,52 @@ int set_error_information(unsigned char *send_buf, int errorno)
     return index;
 }
 
+int reply_error_information(unsigned char *send_buf)
+{
+    char *str = "HTTP/1.1 404 Not Found\r\nServer:Mutu/Linux(0.1)\r\nDate:";    
+    register int index = strlen(str);
+    memcpy(send_buf, str, index);
+
+    char time_buf[TIME_BUFFER_SIZE];
+    memset(time_buf, '\0', sizeof(time_buf));
+    str = get_time_str(time_buf);
+    int len = strlen(time_buf);
+    memcpy(send_buf + index, time_buf, len);
+    index += len;
+
+    len = strlen(ALLOW);
+    memcpy(send_buf + index, ALLOW, len);
+    index += len;
+
+    memcpy(send_buf + index, "\r\nContent-Type:", 15);
+    index += 15;
+	char *mime_type="text/html";
+    len = strlen(mime_type);
+    memcpy(send_buf + index, mime_type, len);
+    index += strlen(mime_type);
+
+    memcpy(send_buf + index, "\r\nContent-Length:", 17);
+    index += 17;
+    char num_len[8];
+	int file_size=564;
+    memset(num_len, '\0', sizeof(num_len));
+    sprintf(num_len, "%d", file_size);
+    len = strlen(num_len);
+    memcpy(send_buf + index, num_len, len);
+    index += len;
+
+    memcpy(send_buf + index, "\r\n\r\n", 4);
+    index += 4;
+
+
+    return index;
+}
+
 int reply_normal_information(unsigned char *send_buf, unsigned char *file_buf,
                              int file_size, char *mime_type)
 {
     char *str = "HTTP/1.1 200 OK\r\nServer:Mutu/Linux(0.1)\r\nDate:";
+    //char *str = "HTTP/1.1 404 File Not Found\r\nServer:Mutu/Linux(0.1)\r\nDate:";
     register int index = strlen(str);
     memcpy(send_buf, str, index);
 

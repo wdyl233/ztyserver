@@ -9,7 +9,7 @@
 
 #define BACKLOG    20		/* length of listening queue on socket */
 #define PORT       8888		/* web server listening port */
-#define SOCKET_SENDBF   1024*1024	/* socket发送缓冲区大小，1GB */
+#define SOCKET_SENDBF   1024*1024*1024	/* socket发送缓冲区大小，1GB */
 
 /* initialize the socket on server, include below
    socket();
