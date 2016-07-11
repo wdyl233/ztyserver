@@ -77,14 +77,11 @@ int epoll_loop(int *listen_fd, int *epoll_fd, struct sockaddr_in *client_addr,
 				}
 
 				else {
-
 					get_send_buf(recv_buf, send_buf,
 						     &send_bytes);
-
 					int send_str = send(events[n].data.fd,
 							    send_buf,
 							    send_bytes, 0);
-
 					close(events[n].data.fd);
 				}
 			}
